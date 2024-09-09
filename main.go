@@ -2,23 +2,30 @@ package main
 
 import "fmt"
 
-type Vertex struct {
-	X int
-	Y int
-}
+func Append(list []int, el ...int) []int {
+	var res []int
+	resLen := len(list) + len(el)
 
-func double(nums []int) []int {
-
-	result := make([]int, 0, len(nums))
-
-	for _, num := range nums {
-		result = append(result, num*2)
+	if resLen <= cap(list) {
+		res = list[:resLen]
+	} else {
+		resCap := 3 * len(list)
+		res = make([]int, resLen, resCap)
+		copy(res, list)
 	}
 
-	return result
+	for i := 0; i < len(el); i++ {
+		res[len(list)+i] = el[i]
+	}
+
+	return res
 }
 
 func main() {
-	list := []int{1, 2, 3, 4, 8}
-	fmt.Println(double(list))
+
+	list := make([]int, 4, 5)
+
+	list = Append(list, 1, 2, 3)
+
+	fmt.Println(list, len(list), cap(list))
 }
