@@ -18,4 +18,12 @@ func worker(recipes <-chan Recipe, done chan<- int) {
 
 func main() {
 
+	recipes := make(chan Recipe)
+	done := make(chan int)
+
+	for i := 0; i < 3; i++ {
+		go worker(recipes, done)
+	}
+
+	close(done)
 }
