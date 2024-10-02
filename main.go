@@ -1,29 +1,31 @@
-package main
+package primes
 
-type Ingredient struct {
-	Name     string
-	Quantity string
-}
+import "context"
 
-type Recipe struct {
-	Name        string
-	Ingredients []Ingredient
-}
+func generatePrimes(ctx context.Context, primes chan<- int) {
+	defer close(primes)
 
-func worker(recipes <-chan Recipe, done chan<- int) {
-	for recipe := range recipes {
-		done <- len(recipe.Ingredients)
+	n := 2
+
+	select {
+	case <-ctx.Done():
+		return
+	default:
+		if isPrime(n) {
+			primes <- n
+		}
+		n++
 	}
 }
 
-func main() {
-
-	recipes := make(chan Recipe)
-	done := make(chan int)
-
-	for i := 0; i < 3; i++ {
-		go worker(recipes, done)
+func isPrime(n int) bool {
+	if n <= 1 {
+		return false
 	}
-
-	close(done)
+	for i := 2; i*i <= n; i++ {
+		if n%i == 0 {
+			return false
+		}
+	}
+	return true
 }
