@@ -1,31 +1,25 @@
-package primes
+package merge_channels
 
-import "context"
+import "sync"
 
-func generatePrimes(ctx context.Context, primes chan<- int) {
-	defer close(primes)
+func merge(channels ...<-chan int) <-chan int {
+	var wg sync.WaitGroup
+	out := make(chan int)
 
-	n := 2
-
-	select {
-	case <-ctx.Done():
-		return
-	default:
-		if isPrime(n) {
-			primes <- n
+	output := func(ch <-chan int) {
+		for c := range ch {
+			out <- c
 		}
-		n++
+		wg.Done()
 	}
-}
+	wg.Add(len(channels))
+	for _, ch := range channels {
+		go output(ch)
+	}
 
-func isPrime(n int) bool {
-	if n <= 1 {
-		return false
-	}
-	for i := 2; i*i <= n; i++ {
-		if n%i == 0 {
-			return false
-		}
-	}
-	return true
+	go func() {
+		wg.Wait()
+		close(out)
+	}()
+	return out
 }
