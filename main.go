@@ -1,25 +1,23 @@
-package merge_channels
+package worker_pool
 
-import "sync"
+func makePool(n int, handler func(int, string)) (handle func(string), wait func()) {
+	pool := make(chan int, n)
 
-func merge(channels ...<-chan int) <-chan int {
-	var wg sync.WaitGroup
-	out := make(chan int)
+	for i := 0; i < n; i++ {
+		pool <- i
+	}
+	handle = func(phrase string) {
+		id := <-pool
+		go func() {
+			handler(id, phrase)
+			pool <- id
+		}()
+	}
 
-	output := func(ch <-chan int) {
-		for c := range ch {
-			out <- c
+	wait = func() {
+		for i := 0; i < n; i++ {
+			pool <- i
 		}
-		wg.Done()
 	}
-	wg.Add(len(channels))
-	for _, ch := range channels {
-		go output(ch)
-	}
-
-	go func() {
-		wg.Wait()
-		close(out)
-	}()
-	return out
+	return handle, wait
 }
