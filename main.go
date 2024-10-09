@@ -1,23 +1,45 @@
-package worker_pool
+package limiter
 
-func makePool(n int, handler func(int, string)) (handle func(string), wait func()) {
-	pool := make(chan int, n)
+import (
+	"time"
+)
 
-	for i := 0; i < n; i++ {
-		pool <- i
+type RateLimiter struct {
+	burstLimit int
+	timeLimit  time.Duration
+	requests   chan struct{}
+	counter    int
+}
+
+func NewRateLimiter(burstLimit int, timeLimit time.Duration) *RateLimiter {
+	return &RateLimiter{
+		timeLimit:  timeLimit,
+		burstLimit: burstLimit,
+		requests:   make(chan struct{}),
+		counter:    0,
 	}
-	handle = func(phrase string) {
-		id := <-pool
-		go func() {
-			handler(id, phrase)
-			pool <- id
-		}()
-	}
+}
 
-	wait = func() {
-		for i := 0; i < n; i++ {
-			pool <- i
+func (r *RateLimiter) AddRequest() {
+	r.requests <- struct{}{}
+}
+
+func (r *RateLimiter) Run() {
+	ticker := time.NewTicker(r.timeLimit)
+	defer ticker.Stop()
+
+	for {
+		if r.counter < r.burstLimit {
+			_ = <-r.requests
+			r.counter++
+			continue
+		}
+		select {
+		case <-ticker.C:
+			_, ok := <-r.requests
+			if !ok {
+				return
+			}
 		}
 	}
-	return handle, wait
 }

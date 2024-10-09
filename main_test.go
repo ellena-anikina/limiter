@@ -1,33 +1,48 @@
-package worker_pool
+package limiter
 
 import (
-	"fmt"
-	"math/rand"
-	"strings"
+	"sync"
 	"testing"
 	"time"
 )
 
-func say(id int, phrase string) {
-	for _, word := range strings.Fields(phrase) {
-		fmt.Printf("Worker #%d says: %s...\n", id, word)
-		dur := time.Duration(rand.Intn(100)) * time.Millisecond
-		time.Sleep(dur)
-	}
-}
+func TestRateLimiter(t *testing.T) {
+	requestsCount := 20
+	limiter := NewRateLimiter(requestsCount/4, 100*time.Millisecond)
 
-func TestMakePool(t *testing.T) {
-	phrases := []string{
-		"go is awesome",
-		"cats are cute",
-		"rain is wet",
-		"channels are hard",
-		"floor is lava",
+	var usedTime time.Duration
+	var wgR sync.WaitGroup
+
+	wgR.Add(1)
+	go func() {
+		defer wgR.Done()
+		start := time.Now()
+		limiter.Run()
+		t.Logf("Run time: %v", time.Now().Sub(start))
+		usedTime = time.Now().Sub(start)
+	}()
+
+	var wg sync.WaitGroup
+	for i := 0; i < requestsCount; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			limiter.AddRequest()
+		}()
 	}
 
-	handle, wait := makePool(2, say)
-	for _, phrase := range phrases {
-		handle(phrase)
+	wg.Wait()
+	close(limiter.requests)
+	wgR.Wait()
+
+	t.Logf("Expected time: %v", time.Duration(requestsCount/4*3)*100*time.Millisecond)
+
+	if len(limiter.requests) != 0 {
+		t.Errorf("Expected 0 remaining requests, got %d", len(limiter.requests))
 	}
-	wait()
+
+	expectedTime := time.Duration(requestsCount/4*3) * 100 * time.Millisecond
+	if usedTime < expectedTime || usedTime > expectedTime+200*time.Millisecond {
+		t.Errorf("Expected time to be more than %v, got %v", expectedTime, usedTime)
+	}
 }
